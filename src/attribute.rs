@@ -3,6 +3,7 @@
 use std::{
     mem::size_of_val,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    os::fd::RawFd,
 };
 
 use netlink_packet_core::{
@@ -135,7 +136,7 @@ pub enum L2tpAttribute {
     LnsMode(bool),
     UsingIpsec(bool),
     RecvTimeout(u64),
-    Fd(u32),
+    Fd(RawFd),
     IpSaddr(Ipv4Addr),
     IpDaddr(Ipv4Addr),
     UdpSport(u16),
@@ -276,7 +277,9 @@ impl Nla for L2tpAttribute {
             | Self::UsingIpsec(v) => buffer[0] = u8::from(*v),
             Self::Cookie(v) | Self::PeerCookie(v) => buffer.copy_from_slice(v),
             Self::RecvTimeout(v) => emit_u64(buffer, *v).unwrap(),
-            Self::Fd(v) => emit_u32(buffer, *v).unwrap(),
+            Self::Fd(v) => {
+                emit_u32(buffer, u32::try_from(*v).unwrap()).unwrap()
+            }
             Self::IpSaddr(v) | Self::IpDaddr(v) => {
                 buffer.copy_from_slice(&v.octets())
             }
@@ -366,7 +369,12 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 Self::RecvTimeout(parse_recv_timeout(payload)?)
             }
             L2TP_ATTR_FD => {
-                Self::Fd(parse_u32(payload).context("invalid L2TP_ATTR_FD")?)
+                let fd = parse_u32(payload).context("invalid L2TP_ATTR_FD")?;
+                Self::Fd(RawFd::try_from(fd).map_err(
+                    |e: std::num::TryFromIntError| {
+                        DecodeError::from(e.to_string())
+                    },
+                )?)
             }
             L2TP_ATTR_IP_SADDR => Self::IpSaddr(parse_ipv4(payload)?),
             L2TP_ATTR_IP_DADDR => Self::IpDaddr(parse_ipv4(payload)?),
