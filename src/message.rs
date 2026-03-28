@@ -63,6 +63,64 @@ pub struct L2tpMessage {
     pub attributes: Vec<L2tpAttribute>,
 }
 
+impl L2tpMessage {
+    pub fn tunnel_create(attributes: Vec<L2tpAttribute>) -> Self {
+        Self {
+            cmd: L2tpCmd::TunnelCreate,
+            attributes,
+        }
+    }
+
+    pub fn tunnel_delete(attributes: Vec<L2tpAttribute>) -> Self {
+        Self {
+            cmd: L2tpCmd::TunnelDelete,
+            attributes,
+        }
+    }
+
+    pub fn tunnel_modify(attributes: Vec<L2tpAttribute>) -> Self {
+        Self {
+            cmd: L2tpCmd::TunnelModify,
+            attributes,
+        }
+    }
+
+    pub fn tunnel_get(attributes: Vec<L2tpAttribute>) -> Self {
+        Self {
+            cmd: L2tpCmd::TunnelGet,
+            attributes,
+        }
+    }
+
+    pub fn session_create(attributes: Vec<L2tpAttribute>) -> Self {
+        Self {
+            cmd: L2tpCmd::SessionCreate,
+            attributes,
+        }
+    }
+
+    pub fn session_delete(attributes: Vec<L2tpAttribute>) -> Self {
+        Self {
+            cmd: L2tpCmd::SessionDelete,
+            attributes,
+        }
+    }
+
+    pub fn session_modify(attributes: Vec<L2tpAttribute>) -> Self {
+        Self {
+            cmd: L2tpCmd::SessionModify,
+            attributes,
+        }
+    }
+
+    pub fn session_get(attributes: Vec<L2tpAttribute>) -> Self {
+        Self {
+            cmd: L2tpCmd::SessionGet,
+            attributes,
+        }
+    }
+}
+
 impl GenlFamily for L2tpMessage {
     fn family_name() -> &'static str {
         L2TP_GENL_NAME

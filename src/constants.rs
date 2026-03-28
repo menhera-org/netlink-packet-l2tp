@@ -78,3 +78,6 @@ pub const L2TP_L2SPECTYPE_DEFAULT: u8 = 1;
 
 pub const L2TP_ENCAPTYPE_UDP: u16 = 0;
 pub const L2TP_ENCAPTYPE_IP: u16 = 1;
+
+pub const L2TP_COOKIE_MAX_LEN: usize = 8;
+pub const L2TP_IFNAME_MAX_LEN: usize = libc::IFNAMSIZ - 1;

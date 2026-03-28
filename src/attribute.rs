@@ -151,6 +151,24 @@ pub enum L2tpAttribute {
     Other(DefaultNla),
 }
 
+impl L2tpAttribute {
+    pub fn if_name(value: impl Into<String>) -> Result<Self, DecodeError> {
+        let value = value.into();
+        validate_ifname(&value)?;
+        Ok(Self::IfName(value))
+    }
+
+    pub fn cookie(value: Vec<u8>) -> Result<Self, DecodeError> {
+        validate_cookie_len(&value, "L2TP_ATTR_COOKIE")?;
+        Ok(Self::Cookie(value))
+    }
+
+    pub fn peer_cookie(value: Vec<u8>) -> Result<Self, DecodeError> {
+        validate_cookie_len(&value, "L2TP_ATTR_PEER_COOKIE")?;
+        Ok(Self::PeerCookie(value))
+    }
+}
+
 impl Nla for L2tpAttribute {
     fn value_len(&self) -> usize {
         match self {
@@ -309,7 +327,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                     .context("invalid L2TP_ATTR_PROTO_VERSION value")?,
             ),
             L2TP_ATTR_IFNAME => Self::IfName(
-                parse_string(payload)
+                parse_ifname(payload)
                     .context("invalid L2TP_ATTR_IFNAME value")?,
             ),
             L2TP_ATTR_CONN_ID => Self::ConnId(
@@ -333,8 +351,10 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 parse_u16(payload)
                     .context("invalid L2TP_ATTR_VLAN_ID value")?,
             ),
-            L2TP_ATTR_COOKIE => Self::Cookie(payload.to_vec()),
-            L2TP_ATTR_PEER_COOKIE => Self::PeerCookie(payload.to_vec()),
+            L2TP_ATTR_COOKIE => Self::Cookie(parse_cookie(payload)?),
+            L2TP_ATTR_PEER_COOKIE => {
+                Self::PeerCookie(parse_peer_cookie(payload)?)
+            }
             L2TP_ATTR_DEBUG => Self::Debug(
                 parse_u32(payload).context("invalid L2TP_ATTR_DEBUG value")?,
             ),
@@ -411,4 +431,42 @@ fn parse_recv_timeout(payload: &[u8]) -> Result<u64, DecodeError> {
         "invalid L2TP_ATTR_RECV_TIMEOUT value length: {}",
         payload.len()
     )))
+}
+
+fn parse_ifname(payload: &[u8]) -> Result<String, DecodeError> {
+    let value = parse_string(payload)?;
+    validate_ifname(&value)?;
+    Ok(value)
+}
+
+fn validate_ifname(value: &str) -> Result<(), DecodeError> {
+    if value.len() > L2TP_IFNAME_MAX_LEN {
+        return Err(DecodeError::from(format!(
+            "L2TP_ATTR_IFNAME too long: {} > {}",
+            value.len(),
+            L2TP_IFNAME_MAX_LEN
+        )));
+    }
+    Ok(())
+}
+
+fn parse_cookie(payload: &[u8]) -> Result<Vec<u8>, DecodeError> {
+    validate_cookie_len(payload, "L2TP_ATTR_COOKIE")?;
+    Ok(payload.to_vec())
+}
+
+fn parse_peer_cookie(payload: &[u8]) -> Result<Vec<u8>, DecodeError> {
+    validate_cookie_len(payload, "L2TP_ATTR_PEER_COOKIE")?;
+    Ok(payload.to_vec())
+}
+
+fn validate_cookie_len(payload: &[u8], name: &str) -> Result<(), DecodeError> {
+    if payload.len() > L2TP_COOKIE_MAX_LEN {
+        return Err(DecodeError::from(format!(
+            "{name} too long: {} > {}",
+            payload.len(),
+            L2TP_COOKIE_MAX_LEN
+        )));
+    }
+    Ok(())
 }

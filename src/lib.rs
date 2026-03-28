@@ -8,6 +8,9 @@ mod constants;
 mod message;
 mod stats;
 
+#[cfg(test)]
+mod test;
+
 pub use self::{
     attribute::{L2tpAttribute, L2tpEncapType, L2tpL2SpecType, L2tpPwType},
     constants::*,
