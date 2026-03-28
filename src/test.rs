@@ -63,7 +63,13 @@ fn test_attr_nested_stats_emit_parse() {
 
 #[test]
 fn test_cookie_constructor_len_check() {
-    assert!(L2tpAttribute::cookie(vec![0u8; L2TP_COOKIE_MAX_LEN]).is_ok());
+    assert!(L2tpAttribute::cookie(vec![]).is_ok());
+    assert!(L2tpAttribute::cookie(vec![0u8; 4]).is_ok());
+    assert!(L2tpAttribute::cookie(vec![0u8; 8]).is_ok());
+    assert!(L2tpAttribute::cookie(vec![0u8; 1]).is_err());
+    assert!(L2tpAttribute::cookie(vec![0u8; 3]).is_err());
+    assert!(L2tpAttribute::cookie(vec![0u8; 5]).is_err());
+    assert!(L2tpAttribute::cookie(vec![0u8; 7]).is_err());
     assert!(L2tpAttribute::cookie(vec![0u8; L2TP_COOKIE_MAX_LEN + 1]).is_err());
 }
 

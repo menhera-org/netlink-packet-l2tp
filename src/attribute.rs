@@ -117,7 +117,7 @@ pub enum L2tpAttribute {
     PwType(L2tpPwType),
     EncapType(L2tpEncapType),
     Offset(u16),
-    DataSeq(u8),
+    DataSeq(u16),
     L2SpecType(L2tpL2SpecType),
     L2SpecLen(u8),
     ProtoVersion(u8),
@@ -175,15 +175,14 @@ impl Nla for L2tpAttribute {
         match self {
             Self::PwType(_) | Self::EncapType(_) => size_of_val(&0u16),
             Self::Offset(v)
+            | Self::DataSeq(v)
             | Self::VlanId(v)
             | Self::UdpSport(v)
             | Self::UdpDport(v)
             | Self::Mtu(v)
             | Self::Mru(v) => size_of_val(v),
             Self::L2SpecType(_) => size_of_val(&0u8),
-            Self::DataSeq(v) | Self::L2SpecLen(v) | Self::ProtoVersion(v) => {
-                size_of_val(v)
-            }
+            Self::L2SpecLen(v) | Self::ProtoVersion(v) => size_of_val(v),
             Self::UdpCsum(v)
             | Self::RecvSeq(v)
             | Self::SendSeq(v)
@@ -252,14 +251,13 @@ impl Nla for L2tpAttribute {
             Self::PwType(v) => emit_u16(buffer, (*v).into()).unwrap(),
             Self::EncapType(v) => emit_u16(buffer, (*v).into()).unwrap(),
             Self::Offset(v)
+            | Self::DataSeq(v)
             | Self::VlanId(v)
             | Self::UdpSport(v)
             | Self::UdpDport(v)
             | Self::Mtu(v)
             | Self::Mru(v) => emit_u16(buffer, *v).unwrap(),
-            Self::DataSeq(v) | Self::L2SpecLen(v) | Self::ProtoVersion(v) => {
-                buffer[0] = *v
-            }
+            Self::L2SpecLen(v) | Self::ProtoVersion(v) => buffer[0] = *v,
             Self::L2SpecType(v) => buffer[0] = (*v).into(),
             Self::IfName(v) => {
                 buffer[..v.len()].copy_from_slice(v.as_bytes());
@@ -313,7 +311,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 parse_u16(payload).context("invalid L2TP_ATTR_OFFSET value")?,
             ),
             L2TP_ATTR_DATA_SEQ => Self::DataSeq(
-                parse_u8(payload)
+                parse_u16(payload)
                     .context("invalid L2TP_ATTR_DATA_SEQ value")?,
             ),
             L2TP_ATTR_L2SPEC_TYPE => Self::L2SpecType(
@@ -429,16 +427,7 @@ fn parse_ipv4(payload: &[u8]) -> Result<Ipv4Addr, DecodeError> {
 }
 
 fn parse_recv_timeout(payload: &[u8]) -> Result<u64, DecodeError> {
-    if payload.len() == 8 {
-        return parse_u64(payload);
-    }
-    if payload.len() == 4 {
-        return parse_u32(payload).map(u64::from);
-    }
-    Err(DecodeError::from(format!(
-        "invalid L2TP_ATTR_RECV_TIMEOUT value length: {}",
-        payload.len()
-    )))
+    parse_u64(payload).context("invalid L2TP_ATTR_RECV_TIMEOUT value")
 }
 
 fn parse_ifname(payload: &[u8]) -> Result<String, DecodeError> {
@@ -469,12 +458,10 @@ fn parse_peer_cookie(payload: &[u8]) -> Result<Vec<u8>, DecodeError> {
 }
 
 fn validate_cookie_len(payload: &[u8], name: &str) -> Result<(), DecodeError> {
-    if payload.len() > L2TP_COOKIE_MAX_LEN {
-        return Err(DecodeError::from(format!(
-            "{name} too long: {} > {}",
-            payload.len(),
-            L2TP_COOKIE_MAX_LEN
-        )));
+    match payload.len() {
+        0 | 4 | 8 => Ok(()),
+        n => Err(DecodeError::from(format!(
+            "{name} has invalid length {n}: must be 0, 4, or 8 bytes",
+        ))),
     }
-    Ok(())
 }
