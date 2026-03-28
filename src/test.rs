@@ -7,7 +7,8 @@ use netlink_packet_generic::{GenlBuffer, GenlHeader};
 
 use crate::{
     L2tpAttribute, L2tpCmd, L2tpEncapType, L2tpMessage, L2tpPwType,
-    L2tpStatsAttr, L2TP_ATTR_COOKIE, L2TP_ATTR_IFNAME, L2TP_COOKIE_MAX_LEN,
+    L2tpStatsAttr, L2TP_ATTR_COOKIE, L2TP_ATTR_DATA_SEQ, L2TP_ATTR_IFNAME,
+    L2TP_ATTR_PEER_COOKIE, L2TP_ATTR_RECV_TIMEOUT, L2TP_COOKIE_MAX_LEN,
     L2TP_IFNAME_MAX_LEN,
 };
 
@@ -89,6 +90,29 @@ fn test_invalid_cookie_parse_error() {
 }
 
 #[test]
+fn test_cookie_parse_len_check() {
+    for len in [0usize, 4, 8] {
+        let raw = emit_nla(L2TP_ATTR_COOKIE, &vec![0u8; len]);
+        let nla = NlaBuffer::new_checked(&raw).unwrap();
+        assert!(L2tpAttribute::parse(&nla).is_ok());
+
+        let raw = emit_nla(L2TP_ATTR_PEER_COOKIE, &vec![0u8; len]);
+        let nla = NlaBuffer::new_checked(&raw).unwrap();
+        assert!(L2tpAttribute::parse(&nla).is_ok());
+    }
+
+    for len in [1usize, 2, 3, 5, 6, 7, 9] {
+        let raw = emit_nla(L2TP_ATTR_COOKIE, &vec![0u8; len]);
+        let nla = NlaBuffer::new_checked(&raw).unwrap();
+        assert!(L2tpAttribute::parse(&nla).is_err());
+
+        let raw = emit_nla(L2TP_ATTR_PEER_COOKIE, &vec![0u8; len]);
+        let nla = NlaBuffer::new_checked(&raw).unwrap();
+        assert!(L2tpAttribute::parse(&nla).is_err());
+    }
+}
+
+#[test]
 fn test_invalid_ifname_parse_error() {
     let raw = emit_nla(L2TP_ATTR_IFNAME, &[b'x'; L2TP_IFNAME_MAX_LEN + 1]);
     let nla = NlaBuffer::new_checked(&raw).unwrap();
@@ -105,6 +129,28 @@ fn test_message_command_constructors() {
         .cmd,
         L2tpCmd::SessionCreate
     );
+}
+
+#[test]
+fn test_dataseq_u16_parse_emit() {
+    let attr = L2tpAttribute::DataSeq(0x1234);
+    let mut raw = vec![0u8; attr.buffer_len()];
+    attr.emit(&mut raw);
+
+    let nla = NlaBuffer::new_checked(&raw).unwrap();
+    let parsed = L2tpAttribute::parse(&nla).unwrap();
+    assert_eq!(attr, parsed);
+
+    // value payload is little-endian native u16 on this platform
+    assert_eq!(raw[2..4], L2TP_ATTR_DATA_SEQ.to_ne_bytes());
+    assert_eq!(raw[4..6], 0x1234u16.to_ne_bytes());
+}
+
+#[test]
+fn test_recv_timeout_parse_rejects_u32_payload() {
+    let raw = emit_nla(L2TP_ATTR_RECV_TIMEOUT, &1u32.to_ne_bytes());
+    let nla = NlaBuffer::new_checked(&raw).unwrap();
+    assert!(L2tpAttribute::parse(&nla).is_err());
 }
 
 fn emit_nla(kind: u16, value: &[u8]) -> Vec<u8> {
