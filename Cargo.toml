@@ -1,0 +1,17 @@
+[package]
+name = "netlink-packet-l2tp"
+version = "0.1.0"
+edition = "2021"
+homepage = "https://github.com/menhera-org/netlink-packet-l2tp"
+repository = "https://github.com/menhera-org/netlink-packet-l2tp"
+keywords = ["l2tp", "netlink", "linux"]
+license = "MIT"
+readme = "README.md"
+description = "L2TP generic netlink packet definitions"
+
+[dependencies]
+libc = "0.2.98"
+log = "0.4.14"
+netlink-packet-generic = { version = "0.4.0" }
+netlink-packet-core = { version = "0.8.0" }
+
