@@ -6,10 +6,10 @@ use std::{
 };
 
 use netlink_packet_core::{
-    emit_i32, emit_u16, emit_u32, emit_u64, parse_i32, parse_ip, parse_ipv6,
-    parse_string, parse_u16, parse_u32, parse_u64, parse_u8, DecodeError,
-    DefaultNla, Emitable, ErrorContext, Nla, NlaBuffer, NlasIterator,
-    Parseable, NLA_F_NESTED,
+    emit_u16, emit_u32, emit_u64, parse_ip, parse_ipv6, parse_string,
+    parse_u16, parse_u32, parse_u64, parse_u8, DecodeError, DefaultNla,
+    Emitable, ErrorContext, Nla, NlaBuffer, NlasIterator, Parseable,
+    NLA_F_NESTED,
 };
 
 use crate::{constants::*, L2tpStatsAttr};
@@ -116,7 +116,7 @@ pub enum L2tpAttribute {
     PwType(L2tpPwType),
     EncapType(L2tpEncapType),
     Offset(u16),
-    DataSeq(u16),
+    DataSeq(u8),
     L2SpecType(L2tpL2SpecType),
     L2SpecLen(u8),
     ProtoVersion(u8),
@@ -135,7 +135,7 @@ pub enum L2tpAttribute {
     LnsMode(bool),
     UsingIpsec(bool),
     RecvTimeout(u64),
-    Fd(i32),
+    Fd(u32),
     IpSaddr(Ipv4Addr),
     IpDaddr(Ipv4Addr),
     UdpSport(u16),
@@ -156,14 +156,15 @@ impl Nla for L2tpAttribute {
         match self {
             Self::PwType(_) | Self::EncapType(_) => size_of_val(&0u16),
             Self::Offset(v)
-            | Self::DataSeq(v)
             | Self::VlanId(v)
             | Self::UdpSport(v)
             | Self::UdpDport(v)
             | Self::Mtu(v)
             | Self::Mru(v) => size_of_val(v),
-            Self::L2SpecType(v) => size_of_val(v),
-            Self::L2SpecLen(v) | Self::ProtoVersion(v) => size_of_val(v),
+            Self::L2SpecType(_) => size_of_val(&0u8),
+            Self::DataSeq(v) | Self::L2SpecLen(v) | Self::ProtoVersion(v) => {
+                size_of_val(v)
+            }
             Self::UdpCsum(v)
             | Self::RecvSeq(v)
             | Self::SendSeq(v)
@@ -232,14 +233,15 @@ impl Nla for L2tpAttribute {
             Self::PwType(v) => emit_u16(buffer, (*v).into()).unwrap(),
             Self::EncapType(v) => emit_u16(buffer, (*v).into()).unwrap(),
             Self::Offset(v)
-            | Self::DataSeq(v)
             | Self::VlanId(v)
             | Self::UdpSport(v)
             | Self::UdpDport(v)
             | Self::Mtu(v)
             | Self::Mru(v) => emit_u16(buffer, *v).unwrap(),
+            Self::DataSeq(v) | Self::L2SpecLen(v) | Self::ProtoVersion(v) => {
+                buffer[0] = *v
+            }
             Self::L2SpecType(v) => buffer[0] = (*v).into(),
-            Self::L2SpecLen(v) | Self::ProtoVersion(v) => buffer[0] = *v,
             Self::IfName(v) => {
                 buffer[..v.len()].copy_from_slice(v.as_bytes());
                 buffer[v.len()] = 0;
@@ -256,7 +258,7 @@ impl Nla for L2tpAttribute {
             | Self::UsingIpsec(v) => buffer[0] = u8::from(*v),
             Self::Cookie(v) | Self::PeerCookie(v) => buffer.copy_from_slice(v),
             Self::RecvTimeout(v) => emit_u64(buffer, *v).unwrap(),
-            Self::Fd(v) => emit_i32(buffer, *v).unwrap(),
+            Self::Fd(v) => emit_u32(buffer, *v).unwrap(),
             Self::IpSaddr(v) | Self::IpDaddr(v) => {
                 buffer.copy_from_slice(&v.octets())
             }
@@ -290,7 +292,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 parse_u16(payload).context("invalid L2TP_ATTR_OFFSET value")?,
             ),
             L2TP_ATTR_DATA_SEQ => Self::DataSeq(
-                parse_u16(payload)
+                parse_u8(payload)
                     .context("invalid L2TP_ATTR_DATA_SEQ value")?,
             ),
             L2TP_ATTR_L2SPEC_TYPE => Self::L2SpecType(
@@ -344,7 +346,7 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>>
                 Self::RecvTimeout(parse_recv_timeout(payload)?)
             }
             L2TP_ATTR_FD => {
-                Self::Fd(parse_i32(payload).context("invalid L2TP_ATTR_FD")?)
+                Self::Fd(parse_u32(payload).context("invalid L2TP_ATTR_FD")?)
             }
             L2TP_ATTR_IP_SADDR => Self::IpSaddr(parse_ipv4(payload)?),
             L2TP_ATTR_IP_DADDR => Self::IpDaddr(parse_ipv4(payload)?),
